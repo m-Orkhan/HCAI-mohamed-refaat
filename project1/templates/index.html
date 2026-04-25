@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Project 1 - Supervised Learning</title>
+</head>
+<body>
+
+<h1>Supervised Learning Interface</h1>
+
+<!-- SECTION 1: Upload -->
+<h2>Step 1: Upload your dataset</h2>
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Upload</button>
+</form>
+
+<!-- SECTION 2: Data preview (only shown after upload) -->
+{% if preview %}
+<h2>Step 2: Your data</h2>
+<p><strong>Rows:</strong> {{ shape.0 }} &nbsp; <strong>Columns:</strong> {{ shape.1 }}</p>
+<p><strong>Label column:</strong> {{ label }}</p>
+<p><strong>Features:</strong> {{ features|join:", " }}</p>
+
+<h3>Preview (first 5 rows)</h3>
+{{ preview|safe }}
+{% endif %}
+
+</body>
+</html>

@@ -2,8 +2,9 @@ import csv
 import io
 import os
 import numpy as np
-from matplotlib import pyplot as plt
-
+import matplotlib
+matplotlib.use('Agg') 
+import matplotlib.pyplot as plt
 
 from django.conf import settings
 from django.shortcuts import render

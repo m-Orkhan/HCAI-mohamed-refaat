@@ -1,0 +1,87 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Project 1 - Supervised Learning</title>
+    <link rel="stylesheet" href="{% static 'project1/style.css' %}">
+</head>
+<body>
+<div class="container">
+
+<h1>Supervised Learning Interface</h1>
+
+<h2>Step 1: Upload your dataset</h2>
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Upload</button>
+</form>
+{% if preview %}
+<h2>Step 2: Your data</h2>
+
+<p><strong>Rows:</strong> {{ shape.0 }} &nbsp; <strong>Columns:</strong> {{ shape.1 }}</p>
+<p><strong>Label column:</strong> {{ label }}</p>
+<p><strong>Task:</strong> {{ problem_type }}</p>
+<p><strong>Target summary:</strong> {{ target_info }}</p>
+
+{% if missing_dict %}
+<p class="missing-warning">⚠ Missing values: ...</p>
+{% else %}
+<p class="no-missing">✓ No missing values found.</p>
+{% endif %}
+
+<h3>Feature Statistics</h3>
+{{ stats|safe }}
+
+<h3>Data Preview (first 10 rows)</h3>
+{{ preview|safe }}
+<h2>Step 3: Visualizations</h2>
+
+<h3>Scatter Plot</h3>
+<form method="post">
+    {% csrf_token %}
+    {{ scatter_form.as_p }}
+    <button type="submit">Update Scatter Plot</button>
+</form>
+<img src="{{ scatter_url }}" alt="Scatter Plot">
+
+<h3>Histogram</h3>
+<form method="post">
+    {% csrf_token %}
+    {{ feature_form.as_p }}
+    <button type="submit">Update Histogram</button>
+</form>
+<img src="{{ hist_url }}" alt="Histogram of {{ selected_feature }}">
+{% if train_form and not score_label %}
+<h2>Step 4: Train a Model</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ train_form.as_p }}
+    <button type="submit">Train</button>
+</form>
+{% endif %}
+{% if score_label %}
+<h2>Results</h2>
+<p><strong>Model:</strong> {{ model_name|title }}</p>
+<p><strong>{{ score_label }}</strong></p>
+<img src="{{ result_plot_url }}" alt="Result plot">
+
+<h2>Make a Prediction</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ predict_form.as_p }}
+    <input type="hidden" name="predict" value="1">
+    <button type="submit">Predict</button>
+</form>
+
+{% if prediction_result %}
+<div class="prediction-result">{{ prediction_result }}</div>
+{% endif %}
+
+{% endif %}
+
+{% endif %}
+
+</div>
+</body>
+</html>
