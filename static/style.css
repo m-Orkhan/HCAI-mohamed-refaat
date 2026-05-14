@@ -111,7 +111,25 @@ button:disabled {
 .title{
     vertical-align: bottom;
 }
+.plots-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-top: 16px;
+    width: 100%;
+}
 
+.plot-box {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.plot-box img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
 .main-text{
   margin-top: 10px;
   margin-left: 5%;

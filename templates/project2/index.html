@@ -1,0 +1,138 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Project 2 - Explainability</title>
+    <link rel="stylesheet" href="{% static 'project2/style.css' %}">
+</head>
+<body>
+<div class="container">
+
+<h1>Penguin Species Classifier</h1>
+
+<form method="get" class="model-switcher">
+    <input type="hidden" name="lam" value="{{ lam }}">
+    <strong>Select Model:</strong>
+    <label>
+        <input type="radio" name="model_type" value="tree"
+               {% if model_type == 'tree' %}checked{% endif %}
+               onchange="this.form.submit()">
+        Decision Tree
+    </label>
+    <label>
+        <input type="radio" name="model_type" value="logistic"
+               {% if model_type == 'logistic' %}checked{% endif %}
+               onchange="this.form.submit()">
+        Logistic Regression
+    </label>
+</form>
+
+<form method="get" class="slider-form">
+    <input type="hidden" name="model_type" value="{{ model_type }}">
+    <label><strong>Complexity penalty (λ):</strong> <span id="lam-val">{{ lam }}</span></label>
+    <input type="range" name="lam" min="0" max="1" step="0.01"
+           value="{{ lam }}"
+           oninput="document.getElementById('lam-val').textContent = this.value">
+    <br><br>
+    <button type="submit">Update</button>
+</form>
+
+<div class="stats-row">
+    <div class="stat-box"><strong>Test Accuracy:</strong> {{ accuracy }}%</div>
+    {% if model_type == 'tree' %}
+        <div class="stat-box"><strong>Number of Leaves:</strong> {{ n_leaves }}</div>
+    {% else %}
+        <div class="stat-box"><strong>Complexity (L1 norm):</strong> {{ complexity }}</div>
+        <div class="stat-box"><strong>Regularization C:</strong> {{ C }}</div>
+    {% endif %}
+</div>
+
+{% if model_type == 'tree' %}
+    <img src="{{ tree_url }}" alt="Decision Tree" style="max-width: 100%;">
+{% else %}
+    <img src="{{ coef_url }}" alt="Logistic Regression Coefficients" style="max-width: 700px;">
+{% endif %}
+
+<h2>Counterfactual Explanations</h2>
+<p>Select a penguin and a target species to see what would need to change for the model to predict it differently.</p>
+
+<form method="post" action="?model_type={{ model_type }}&lam={{ lam }}">
+    {% csrf_token %}
+
+    <label>Select a penguin:</label>
+    <select name="penguin_idx">
+        {% for idx, label in penguin_options %}
+            <option value="{{ idx }}" {% if idx == penguin_idx %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <br><br>
+
+    <label>Target species:</label>
+    <select name="target_class">
+        {% for cls in classes %}
+            <option value="{{ cls }}" {% if cls == target_class %}selected{% endif %}>{{ cls }}</option>
+        {% endfor %}
+    </select>
+    <br><br>
+
+    <label>Number of counterfactuals to show:</label>
+    <select name="k">
+        <option value="1" {% if k == 1 %}selected{% endif %}>1</option>
+        <option value="2" {% if k == 2 %}selected{% endif %}>2</option>
+        <option value="3" {% if k == 3 %}selected{% endif %}>3</option>
+        <option value="5" {% if k == 5 %}selected{% endif %}>5</option>
+    </select>
+    <br><br>
+
+    <button type="submit">Generate Counterfactuals</button>
+</form>
+
+{% if cf_error %}
+    <p class="error-msg">{{ cf_error }}</p>
+{% endif %}
+
+{% if cf_table %}
+<h3>Original Penguin (#{{ penguin_idx }} — {{ original_species }})</h3>
+<table class="table">
+    <tr>{% for col in feature_cols %}<th>{{ col }}</th>{% endfor %}</tr>
+    <tr>{% for val in original_display %}<td>{{ val }}</td>{% endfor %}</tr>
+</table>
+
+<h3>Counterfactuals → predicted as {{ target_class }}</h3>
+<table class="table">
+    <tr>{% for col in feature_cols %}<th>{{ col }}</th>{% endfor %}</tr>
+    {% for row in cf_table %}
+    <tr>
+        {% for cell in row %}
+        <td {% if cell.changed %}style="color: red; font-weight: bold;"{% endif %}>{{ cell.value }}</td>
+        {% endfor %}
+    </tr>
+    {% endfor %}
+</table>
+{% endif %}
+
+<h2>Feature Effect Plots</h2>
+<p>Select a numerical feature to see how it affects the predicted probability of each species.</p>
+
+<form method="get">
+    <input type="hidden" name="model_type" value="{{ model_type }}">
+    <input type="hidden" name="lam" value="{{ lam }}">
+    <label>Select a feature:</label>
+    <select name="selected_feature" onchange="this.form.submit()">
+        {% for feat in numerical_features %}
+            <option value="{{ feat }}" {% if feat == selected_feature %}selected{% endif %}>{{ feat }}</option>
+        {% endfor %}
+    </select>
+</form>
+
+<div>
+    <h3>Partial Dependence Plot</h3>
+    <img src="{{ pdp_url }}" alt="PDP" style="max-width: 600px; width: 100%; display: block;">
+    
+    <h3>Accumulated Local Effects Plot</h3>
+    <img src="{{ ale_url }}" alt="ALE" style="max-width: 600px; width: 100%; display: block;">
+</div>
+
+</div>
+</body>
+</html>
