@@ -172,3 +172,14 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+project3/models/*.joblib
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+media/*
+!media/.gitkeep
+project3/models/
+report/*.aux
+report/*.log
+report/*.out

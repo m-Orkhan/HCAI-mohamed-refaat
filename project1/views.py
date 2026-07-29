@@ -1,5 +1,6 @@
 import io
 import os
+import time
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -21,7 +22,7 @@ def save_plot(fig, filename):
     path = os.path.join(settings.MEDIA_ROOT, filename)
     fig.savefig(path)
     plt.close(fig)
-    return settings.MEDIA_URL + filename
+    return f"{settings.MEDIA_URL}{filename}?v={int(time.time() * 1000)}"
 
 def read_csv(data):
     return pd.read_csv(io.StringIO(data), sep=None, engine='python')
@@ -103,8 +104,8 @@ def get_summary(df, label, problem_type):
 
 def train_model(df, label, problem_type, model_name, test_size):
     features = list(df.columns[:-1])
-    X = df[features].values
-    y = df[label].values
+    X = df[features].to_numpy()
+    y = df[label].to_numpy()
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=float(test_size), random_state=42
@@ -130,12 +131,19 @@ def train_model(df, label, problem_type, model_name, test_size):
 
     return score_label, result_plot_url
 
-def build_context(df, label, problem_type, features, extra={}):
+def build_context(df, label, problem_type, features,
+                  feature_x=None, feature_y=None, hist_feature=None, extra=None):
     stats, missing_dict, target_info = get_summary(df, label, problem_type)
-    feature_x = features[0]
-    feature_y = features[1] if len(features) > 1 else label
+
+    if feature_x is None:
+        feature_x = features[0]
+    if feature_y is None:
+        feature_y = features[1] if len(features) > 1 else label
+    if hist_feature is None:
+        hist_feature = features[0]
+
     scatter_url = make_scatter(df, feature_x, feature_y, label, problem_type)
-    hist_url = make_histogram(df, features[0], label, problem_type)
+    hist_url = make_histogram(df, hist_feature, label, problem_type)
 
     context = {
         'form': CSVUploadForm(),
@@ -149,106 +157,116 @@ def build_context(df, label, problem_type, features, extra={}):
         'problem_type': problem_type,
         'scatter_url': scatter_url,
         'hist_url': hist_url,
-        'selected_feature': features[0],
-        'feature_form': FeatureSelectForm(features),
-        'scatter_form': ScatterSelectForm(features),
+        'selected_feature': hist_feature,
+        'feature_form': FeatureSelectForm(features, initial={'feature': hist_feature}),
+        'scatter_form': ScatterSelectForm(
+            features, initial={'feature_x': feature_x, 'feature_y': feature_y}
+        ),
         'train_form': TrainForm(problem_type),
     }
-    context.update(extra)
+    if extra:
+        context.update(extra)
     return context
 
+def get_selections(request, features, label):
+    feature_x = request.session.get('selected_x')
+    feature_y = request.session.get('selected_y')
+    hist_feature = request.session.get('selected_hist')
+    if feature_x not in features:
+        feature_x = features[0]
+    if feature_y not in list(features) + [label]:
+        feature_y = features[1] if len(features) > 1 else label
+    if hist_feature not in features:
+        hist_feature = features[0]
+    return feature_x, feature_y, hist_feature
+
 def index(request):
+    if request.method != 'POST':
+        return render(request, 'project1/index.html', {'form': CSVUploadForm()})
+
     context = {'form': CSVUploadForm()}
 
-    if request.method == 'POST':
-        if 'file' in request.FILES:
-            form = CSVUploadForm(request.POST, request.FILES)
-            if form.is_valid():
-                file = request.FILES['file']
-                decoded = file.read().decode('utf-8')
-                df = read_csv(decoded)
-                problem_type = form.cleaned_data['problem_type']
+    if 'file' in request.FILES:
+        form = CSVUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            decoded = request.FILES['file'].read().decode('utf-8')
+            df = read_csv(decoded)
+            problem_type = form.cleaned_data['problem_type']
 
-                request.session.pop('csv_data', None)
-                request.session.pop('problem_type', None)
-                request.session.pop('selected_hist', None)
+            for key in ('csv_data', 'problem_type', 'selected_hist', 'selected_x',
+                        'selected_y', 'features', 'model_name', 'score_label',
+                        'result_plot_url'):
+                request.session.pop(key, None)
 
-                request.session['csv_data'] = decoded
-                request.session['problem_type'] = problem_type
+            request.session['csv_data'] = decoded
+            request.session['problem_type'] = problem_type
 
-                features = list(df.columns[:-1])
-                label = df.columns[-1]
-                context = build_context(df, label, problem_type, features)
-        elif 'feature' in request.POST:
-            csv_data = request.session.get('csv_data')
-            problem_type = request.session.get('problem_type')
-            if csv_data:
-                df = read_csv(csv_data)
-                features = list(df.columns[:-1])
-                label = df.columns[-1]
-                selected = request.POST['feature']
-                request.session['selected_hist'] = selected
-                hist_url = make_histogram(df, selected, label, problem_type)
-                context = build_context(df, label, problem_type, features, {
-                    'hist_url': hist_url,
-                    'selected_feature': selected,
-                    'feature_form': FeatureSelectForm(features, request.POST),
-                })
-        elif 'feature_x' in request.POST:
-            csv_data = request.session.get('csv_data')
-            problem_type = request.session.get('problem_type')
-            if csv_data:
-                df = read_csv(csv_data)
-                features = list(df.columns[:-1])
-                label = df.columns[-1]
-                feature_x = request.POST['feature_x']
-                feature_y = request.POST['feature_y']
-                scatter_url = make_scatter(df, feature_x, feature_y, label, problem_type)
-                hist_url = make_histogram(df, request.session.get('selected_hist', features[0]), label, problem_type)
-                context = build_context(df, label, problem_type, features, {
-                    'scatter_url': scatter_url,
-                    'hist_url': hist_url,
-                    'scatter_form': ScatterSelectForm(features, request.POST),
-                })
-        elif 'model' in request.POST:
-            csv_data = request.session.get('csv_data')
-            problem_type = request.session.get('problem_type')
-            if csv_data:
-                df = read_csv(csv_data)
-                features = list(df.columns[:-1])
-                label = df.columns[-1]
-                model_name = request.POST['model']
-                test_size = request.POST['split']
-                score_label, result_plot_url = train_model(df, label, problem_type, model_name, test_size)
-                request.session['features'] = features
-                request.session['model_name'] = model_name
-                context = build_context(df, label, problem_type, features, {
-                    'score_label': score_label,
-                    'result_plot_url': result_plot_url,
-                    'model_name': model_name,
-                    'predict_form': PredictForm(features),
-                })
-        elif 'predict' in request.POST:
-            csv_data = request.session.get('csv_data')
-            problem_type = request.session.get('problem_type')
-            features = request.session.get('features')
-            if csv_data and features:
-                df = read_csv(csv_data)
-                label = df.columns[-1]
-                predict_form = PredictForm(features, request.POST)
-                prediction_result = None
-                if predict_form.is_valid():
-                    input_data = np.array([[predict_form.cleaned_data[f] for f in features]])
-                    model = joblib.load(MODEL_PATH)
-                    prediction = model.predict(input_data)[0]
-                    if problem_type == 'classification':
-                        prediction_result = f'Predicted class: {prediction}'
-                    else:
-                        prediction_result = f'Predicted value: {round(float(prediction), 4)}'
-                context = build_context(df, label, problem_type, features, {
-                    'predict_form': predict_form,
-                    'prediction_result': prediction_result,
-                    'model_name': request.session.get('model_name'),
-                })
+            features = list(df.columns[:-1])
+            label = df.columns[-1]
+            context = build_context(df, label, problem_type, features)
+        return render(request, 'project1/index.html', context)
 
+    csv_data = request.session.get('csv_data')
+    problem_type = request.session.get('problem_type')
+    if not csv_data:
+        return render(request, 'project1/index.html', context)
+
+    df = read_csv(csv_data)
+    features = list(df.columns[:-1])
+    label = df.columns[-1]
+    feature_x, feature_y, hist_feature = get_selections(request, features, label)
+
+    trained_features = request.session.get('features')
+    extra = {
+        'score_label': request.session.get('score_label'),
+        'result_plot_url': request.session.get('result_plot_url'),
+        'model_name': request.session.get('model_name'),
+    }
+    if trained_features:
+        extra['predict_form'] = PredictForm(trained_features)
+
+    if 'predict' in request.POST:
+        pf_features = trained_features or features
+        predict_form = PredictForm(pf_features, request.POST)
+        extra['predict_form'] = predict_form
+        if predict_form.is_valid():
+            input_data = np.array(
+                [[predict_form.cleaned_data[f] for f in pf_features]], dtype=float
+            )
+            model = joblib.load(MODEL_PATH)
+            prediction = model.predict(input_data)[0]
+            if problem_type == 'classification':
+                extra['prediction_result'] = f'Predicted class: {prediction}'
+            else:
+                extra['prediction_result'] = f'Predicted value: {round(float(prediction), 4)}'
+
+    elif 'model' in request.POST:
+        model_name = request.POST['model']
+        test_size = request.POST['split']
+        score_label, result_plot_url = train_model(
+            df, label, problem_type, model_name, test_size
+        )
+        request.session['features'] = features
+        request.session['model_name'] = model_name
+        request.session['score_label'] = score_label
+        request.session['result_plot_url'] = result_plot_url
+        extra.update({
+            'score_label': score_label,
+            'result_plot_url': result_plot_url,
+            'model_name': model_name,
+            'predict_form': PredictForm(features),
+        })
+
+    elif 'feature_x' in request.POST:
+        feature_x = request.POST['feature_x']
+        feature_y = request.POST['feature_y']
+        request.session['selected_x'] = feature_x
+        request.session['selected_y'] = feature_y
+
+    elif 'feature' in request.POST:
+        hist_feature = request.POST['feature']
+        request.session['selected_hist'] = hist_feature
+
+    context = build_context(df, label, problem_type, features,
+                            feature_x, feature_y, hist_feature, extra)
     return render(request, 'project1/index.html', context)

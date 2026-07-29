@@ -26,8 +26,8 @@ def load_and_prepare():
     df_encoded['sex'] = df_encoded['sex'].astype('category').cat.codes
     feature_cols = ['island', 'bill_length_mm', 'bill_depth_mm',
                     'flipper_length_mm', 'body_mass_g', 'sex', 'year']
-    X = df_encoded[feature_cols].values
-    y = df_encoded['species'].values
+    X = df_encoded[feature_cols].to_numpy()
+    y = df_encoded['species'].to_numpy()
     return X, y, feature_cols, df_raw, df_encoded
 
 def train_all_trees(X_train, X_test, y_train, y_test):
@@ -221,7 +221,7 @@ def generate_counterfactuals(x_original, target_class, clf, feature_cols, df_enc
     if len(matching) == 0:
         return None
 
-    mad = np.median(np.abs(df_encoded_features.values - np.median(df_encoded_features.values, axis=0)), axis=0)
+    mad = np.median(np.abs(df_encoded_features.to_numpy() - np.median(df_encoded_features.to_numpy(), axis=0)), axis=0)
     mad = np.where(mad == 0, 1, mad)
     distances = np.sum(np.abs(matching - x_original) / mad, axis=1)
     top_k_idx = np.argsort(distances)[:k]
@@ -275,7 +275,7 @@ def index(request):
         target_class = request.POST.get('target_class')
         k = int(request.POST.get('k', 3))
 
-        x_original = df_encoded[feature_cols].values[penguin_idx]
+        x_original = df_encoded[feature_cols].to_numpy()[penguin_idx]
 
         counterfactuals = generate_counterfactuals(
             x_original, target_class, best_clf, feature_cols,

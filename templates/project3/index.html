@@ -1,0 +1,29 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Project 3 - Active Learning for Learning-to-Defer</title>
+    <link rel="stylesheet" href="{% static 'project3/style.css' %}">
+</head>
+<body>
+<div class="container">
+
+<h1>Active Learning for Learning-to-Defer</h1>
+
+<p>
+    This project builds a human-AI team for news classification on the AG News dataset.
+    A TF-IDF + logistic regression classifier (91.89% test accuracy) collaborates with a
+    simulated expert. A learning to defer system routes each article to whichever
+    agent is more reliable, surpassing both individually.
+</p>
+
+<p>
+The full description of the experiments, design choices, and results is in
+    the report below.
+</p>
+
+<a class="download-btn" href="{% static 'project3/report.pdf' %}" download>Download Report (PDF)</a>
+
+</div>
+</body>
+</html>
