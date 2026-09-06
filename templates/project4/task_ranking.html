@@ -1,0 +1,118 @@
+{% extends "project4/base_study.html" %}
+{% block content %}
+<div class="study-header">
+    <span>Block {{ block_number }} · Task {{ task_number }}</span>
+    <span id="timer" data-remaining="{{ remaining }}"></span>
+</div>
+
+<h1>Rank these from most to least preferred</h1>
+<p class="hint">
+    Click a movie to add it to your ranking, starting with the one you would most
+    like to watch. Rank at least two. Leave out any you haven't seen or can't judge.
+</p>
+
+<div class="rank-layout">
+    <div>
+        <h3>Available</h3>
+        <div id="available">
+            {% for m in movies %}
+            <div class="movie-card small" data-idx="{{ m.idx }}">
+                <strong>{{ m.title }}</strong>
+                <span class="meta">{{ m.year }} · {{ m.genres }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div>
+        <h3>Your ranking</h3>
+        <ol id="ranked-list" class="ranked-list"></ol>
+        <form method="post" id="rank-form">
+            {% csrf_token %}
+            <input type="hidden" name="ranked_indices" id="ranked">
+            <button type="submit" class="btn btn-primary" id="submit-btn" disabled>Submit ranking</button>
+        </form>
+    </div>
+</div>
+
+<script>
+const available = document.getElementById('available');
+const list = document.getElementById('ranked-list');
+const hidden = document.getElementById('ranked');
+const submitBtn = document.getElementById('submit-btn');
+const titles = {};
+let order = [];
+
+available.querySelectorAll('.movie-card').forEach(c => {
+    titles[c.dataset.idx] = c.querySelector('strong').textContent;
+});
+
+function render() {
+    list.innerHTML = '';
+    order.forEach((idx, position) => {
+        const li = document.createElement('li');
+        const span = document.createElement('span');
+        span.textContent = titles[idx];
+        li.appendChild(span);
+
+        const controls = document.createElement('span');
+        controls.className = 'rank-controls';
+
+        const up = document.createElement('button');
+        up.type = 'button';
+        up.textContent = '↑';
+        up.disabled = position === 0;
+        up.onclick = () => {
+            [order[position - 1], order[position]] = [order[position], order[position - 1]];
+            render();
+        };
+
+        const down = document.createElement('button');
+        down.type = 'button';
+        down.textContent = '↓';
+        down.disabled = position === order.length - 1;
+        down.onclick = () => {
+            [order[position + 1], order[position]] = [order[position], order[position + 1]];
+            render();
+        };
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.textContent = '✕';
+        remove.onclick = () => {
+            order.splice(position, 1);
+            render();
+        };
+
+        controls.append(up, down, remove);
+        li.appendChild(controls);
+        list.appendChild(li);
+    });
+
+    available.querySelectorAll('.movie-card').forEach(c => {
+        c.classList.toggle('used', order.includes(c.dataset.idx));
+    });
+
+    hidden.value = order.join(',');
+    submitBtn.disabled = order.length < 2;
+}
+
+available.addEventListener('click', e => {
+    const card = e.target.closest('.movie-card');
+    if (!card || order.includes(card.dataset.idx)) return;
+    order.push(card.dataset.idx);
+    render();
+});
+
+render();
+
+
+const el = document.getElementById('timer');
+let r = parseInt(el.dataset.remaining);
+function tick() {
+    const m = Math.floor(r / 60), s = String(r % 60).padStart(2, '0');
+    el.textContent = m + ':' + s + ' left in this block';
+    if (r > 0) { r--; setTimeout(tick, 1000); }
+}
+tick();
+</script>
+{% endblock %}

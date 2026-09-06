@@ -1,0 +1,210 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{hyperref}
+
+\title{Preference Elicitation for Movie Recommendation\\\large Human Centric Artificial Intelligence  Project 4}
+\author{Mohamed Refaat\\Matriculation number: 670229}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+This project designs a user study comparing two interfaces for eliciting the preferences of a new user of a movie recommender. In the first, the participant ranks ten movies from most to least preferred. In the second,  the participant repeatedly chooses between two movies.The study was designed and the interface implemented.
+
+
+\section{Feature Representation}
+\label{sec:features}
+
+\subsection{Setting}
+The IMDB 5000 Movie Dataset contains metadata for approximately 5{,}000 films but no user ratings. 
+\subsection{Chosen features}
+Each movie $x$ is represented by 23 features:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{llc}
+\toprule
+Group & Contents & Dimensions \\
+\midrule
+Genre indicators & 15 most frequent genres, binary & 15 \\
+Numeric attributes & release year, runtime, IMDb score, $\log_{10}$ budget & 4 \\
+Content rating & family (G/PG), teen (PG-13), mature (R/NC-17/X), other & 4 \\
+\bottomrule
+\end{tabular}
+\caption{Feature representation. Numeric attributes are standardised to zero mean and unit variance.}
+\end{table}
+
+\subsection{Justification}
+Interpretability. Under the linear utility $U(x) = w^\top x$, each component of $w$ is the participant's weight on one human meaningful attribute. After elicitation one can state that a participant weights Science Fiction at $+0.8$ and runtime at $-0.3$. In a human centric system this matters beyond convenience: it makes the learned preference model inspectable and contestable by the person it describes.
+
+Coverage of how people describe film taste. Genre, era, length, critical standing and production scale are the attributes people actually cite when explaining what they like.
+
+Dimensionality. other alternatives were considered and rejected. TF--IDF over plot keywords, or one hot encodings of director and cast, would add hundreds or thousands of dimensions. With roughly 15--30 interactions per participant the resulting model would be way too large.
+
+Standardisation. The numeric attributes have incomparable scales (year $\approx 2000$, runtime $\approx 120$, score $\approx 7$). Without standardisation the L2 prior would penalise their weights unequally, so that regularisation strength would depend on an arbitrary choice of units.
+
+\subsection{Filtering decisions}
+Two filters are applied when constructing the movie pool, and both are substantive rather than cosmetic.
+
+Country restriction to USA productions. The budget column records amounts in local currency without conversion, so a South Korean production budgeted at 4{,}000{,}000{,}000 KRW and a US production budgeted at 40{,}000{,}000 USD appear in the same column on incompatible scales.
+
+Popularity threshold. Only films with at least 100{,}000 IMDb votes are retained, leaving 954 movies. Elicitation only produces signal if the participant can form a preference. If most presented pairs consist of two films the participant has never encountered, the responses are noise, and that noise enters $w$ indistinguishably from genuine preference. Note that this uses \texttt{num\_voted\_users} (how many people have seen the film) rather than \texttt{imdb\_score} (how highly they rated it); recognisability, not quality, is the relevant criterion. The remaining pool is roughly twenty times larger than the number of films any single participant sees, so no diversity is lost.
+
+The IMDb score itself is retained as a \emph{feature}, not as ground truth. A participant's weight on it measures how far their taste tracks critical consensus, which is an interesting parameter in its own right, but it is never treated as a proxy for what that participant prefers.
+
+\section{From Bradley Terry to Rankings}
+\label{sec:model}
+
+\subsection{The pairwise case}
+The Bradley Terry model gives the probability that item $i$ is preferred to item $j$ as
+\[
+P(i \succ j) = \frac{\exp(w^\top x_i)}{\exp(w^\top x_i) + \exp(w^\top x_j)}
+= \sigma\!\left(w^\top (x_i - x_j)\right),
+\]
+where $\sigma$ is the logistic function. This covers Design~2 directly.
+
+\subsection{Proposed extension: the Plackett Luce model}
+Design~1 produces a full ordering $i_1 \succ i_2 \succ \cdots \succ i_n$ of $n = 10$ movies. The proposed extension models this as a sequence of choices: the participant first selects the best item from the whole set, then the best of what remains, and so on. This gives
+\[
+P(i_1 \succ i_2 \succ \cdots \succ i_n)
+= \prod_{k=1}^{n-1} \frac{\exp(w^\top x_{i_k})}{\sum_{l=k}^{n} \exp(w^\top x_{i_l})}.
+\]
+
+\textbf{Why this formulation.} Setting $n = 2$ reduces the product to a single factor,
+\[
+\frac{\exp(w^\top x_{i_1})}{\exp(w^\top x_{i_1}) + \exp(w^\top x_{i_2})},
+\]
+which is exactly Bradley Terry. The ranking model is therefore a strict generalisation rather than a different model, and both study conditions can be fitted with the same estimator on the same parameter $w$. This is what makes the comparison in Section~\ref{sec:study} valid. If each interface required its own estimator, any observed difference would confound the interface with the model used to analyse it.
+
+Rejected alternative. A ranking of ten items implies $\binom{10}{2} = 45$ pairwise comparisons, and one could feed these to the Bradley Terry likelihood as if they were 45 independent observations. This is rejected because they are not independent: they arise from a single decision process, and the transitivity imposed by producing one ordering means the 45 comparisons carry far less than 45 comparisons' worth of information. Treating them as independent would inflate the apparent information content of the ranking condition and bias the study in favour of the hypothesis being tested. Plackett Luce models the dependence correctly by construction.
+
+\subsection{Partial rankings}
+Participants may leave movies unranked (see Section~\ref{sec:skip}). If the participant ranks $k$ of the $n$ presented movies, the likelihood is evaluated over the first $k$ stages only, with the unranked movies remaining in every denominator:
+\[
+P(i_1 \succ \cdots \succ i_k \succ \{\text{rest}\})
+= \prod_{j=1}^{k} \frac{\exp(w^\top x_{i_j})}{\sum_{l=j}^{n} \exp(w^\top x_{i_l})}.
+\]
+This encodes exactly what the participant asserted, that each ranked movie is preferred to everything below it, including the unranked ones without inventing an ordering among the movies they declined to rank. The alternative of discarding incomplete tasks would both waste data and bias the sample toward films the participant happened to recognise.
+
+\subsection{Estimation}
+\label{sec:estimation}
+The preference vector is estimated by maximum a posteriori inference with a Gaussian prior, equivalently by minimising the regularised negative log likelihood
+\[
+\hat{w} = \arg\min_w \; -\sum_{r \in \mathcal{R}} \log P(r \mid w) \;+\; \frac{\lambda}{2}\|w\|_2^2 ,
+\]
+over all recorded responses $\mathcal{R}$, using L-BFGS. The prior is a structural necessity, with 23 parameters and on the order of 15--30 observations the likelihood alone is underdetermined, and the maximum likelihood estimate would be unbounded whenever the responses are linearly separable in feature space, which is likely at this sample size. The prior also encodes a defensible default, namely that a participant about whom nothing is known has no strong preference in any direction. The value of $\lambda$ would be selected by cross validation on pilot data.
+
+Numerically, the log sum exp in each denominator is computed by subtracting the maximum utility before exponentiating, to avoid overflow as utilities grow during optimisation.
+
+\section{User Study Design}
+\label{sec:study}
+
+\subsection{Research question and hypotheses}
+The question is which interface learns more about a person's film preferences for a fixed amount of their time.
+
+\begin{itemize}
+\item \textbf{H1 (primary).} Ranking ten movies yields a more accurate preference estimate per minute of participant time than pairwise comparison.
+\item \textbf{H2 (secondary).} Ranking imposes a higher cognitive load per task than pairwise comparison.
+\item \textbf{H3 (secondary).} Participants report different subjective satisfaction with how well each interface captured their taste.
+\end{itemize}
+
+H1 and H2 may well both hold, H3 is deliberately two sided, as there is no strong prior on its direction.
+
+\subsection{Design}
+A within-subject design with counterbalanced order. Every participant completes both conditions; the order is randomised per participant.
+
+\textbf{Why within subject.} Film taste varies enormously between people, and that between person variance would dominate a between subject comparison, requiring a far larger sample to detect an interface effect. Each participant serves as their own control.
+
+\textbf{Cost and mitigation.} Within subject designs are exposed to order and carryover effects. These are addressed by randomising which condition comes first, capping each block by time, inserting a break between blocks, and drawing the two blocks' movies from disjoint pools so that familiarity acquired in the first block cannot transfer to the second.
+
+\subsection{Procedure}
+\begin{enumerate}
+\item Information sheet, followed by a separate consent screen.
+\item Block~1: five minutes of the first condition.
+\item Workload and satisfaction questionnaire.
+\item Break, continued at the participant's discretion.
+\item Block~2: five minutes of the second condition, disjoint movie pool.
+\item Workload and satisfaction questionnaire.
+\item Validation set: 20 pairwise comparisons drawn from a third disjoint pool, identical for all participants.
+\item Debrief.
+\end{enumerate}
+Total duration is approximately 20 minutes.
+
+\subsection{Equal time, not equal task count}
+\label{sec:equaltime}
+The conditions are equated on time rather than on the number of tasks. This is the most consequential design decision in the study. A single ten item ranking and a single pairwise choice are not comparable units of work: the ranking takes far longer and conveys far more constraint on $w$. Equating on task count would therefore favour whichever condition happened to be chosen as the unit, and the result would be an artefact of that choice.
+
+\subsection{Movie selection}
+Movies are drawn uniformly at random from the pool.
+
+Adaptive selection, choosing the next pair to maximise expected information about $w$, for instance by selecting the pair whose predicted choice probability is closest to $0.5$ under the current posterior, or by a D-optimality criterion on the feature difference vectors would very likely improve elicitation efficiency.
+
+\subsection{Skipping and its rationale}
+\label{sec:skip}
+Both interfaces allow the participant to decline. In the pairwise condition a button records ``I haven't seen either / no preference''. In the ranking condition the participant may rank as few as two of the ten movies and leave the rest unordered.
+
+Forcing a response when the participant cannot form an actual preference does not produce missing data, it produces fabricated data, which enters $\hat{w}$ indistinguishably from real preference and cannot be detected afterwards. which the partial ranking likelihood handles correctly. The skip rate is additionally recorded as a secondary outcome, since a condition that is skipped more often is telling us something about the interface.
+
+\subsection{Measures}
+\textbf{Primary.} For each participant and each condition, $\hat{w}$ is estimated from that block's responses alone and scored by its accuracy in predicting that participant's 20 validation comparisons. The primary outcome is accuracy per minute of elicitation time in that block.
+
+\textbf{Secondary.} Number of tasks completed; median time per task; skip rate; NASA-TLX-style ratings of mental demand, effort and frustration on 1--10 scales; self reported satisfaction with how well the interface captured the participant's taste.
+
+\textbf{Why a participant generated validation set.} No external ground truth for an individual's preferences exists in this dataset, so the held out set must be produced by the participant. Placing it after both blocks prevents leakage, and using one shared validation set to score both conditions is what makes the comparison fair.
+
+
+\subsection{Participants and recruitment}
+Target $N = 40$. A within-subject comparison detecting a medium effect ($d = 0.5$) at $\alpha = 0.05$ with 80\% power requires 34 participants for a paired $t$-test; 40 allows for dropout and exclusions. Inclusion criteria are age 18 or over and sufficient English to read film titles and metadata.
+
+A pilot with five participants precedes the main run, to check instruction clarity, verify that five minutes yields enough tasks in both conditions, and estimate the variance needed to confirm the power calculation. Block length and the number of movies per ranking are parameters the pilot is expected to tune.
+
+\subsection{Analysis plan}
+The analysis is specified before data collection to avoid selective reporting.
+
+\textbf{Preprocessing.} Participants who withdraw, who complete fewer than three tasks in either block, or whose skip rate exceeds 80\% in either block are excluded and reported. For each retained participant, $\hat{w}_{\text{pair}}$ and $\hat{w}_{\text{rank}}$ are fitted independently from the respective blocks with $\lambda$ fixed at the pilot-selected value.
+
+\textbf{Primary test.} Accuracy per minute is paired within participant and compared with a two sided paired $t$-test, or a Wilcoxon signed-rank test if the differences fail a Shapiro--Wilk normality check. Effect size is reported as Cohen's $d_z$ with a 95\% confidence interval. The confidence interval, not the $p$-value, carries the substantive conclusion: an interval that excludes zero but lies close to it would indicate a real but practically negligible difference.
+
+\textbf{Order effects.} A linear mixed model with accuracy per minute as outcome, fixed effects for condition, block position and their interaction, and a random intercept per participant. A significant interaction indicates carryover, which would qualify the primary result.
+
+\textbf{Secondary tests.} Workload and satisfaction items compared by paired tests as above, with Holm correction across the secondary family. Skip rates compared by paired test on arcsine transformed proportions.
+
+\textbf{Exploratory.} Accuracy as a function of elapsed time within a block, to see whether either condition saturates; correlation between skip rate and validation accuracy; inspection of which feature weights are recovered consistently across the two conditions within a participant, as an internal consistency check on the elicitation itself.
+
+\textbf{Interpretation in advance.} If H1 is supported and H2 is not, ranking is preferable on both counts. If both are supported, the recommendation depends on context: ranking for one off onboarding where the user has committed attention, pairwise for incremental elicitation woven into ordinary use. If H1 is not supported, the simpler pairwise interface is preferred, since it is easier to implement, easier to explain and imposes less load. All four outcomes are informative, which is a property worth having before collecting data.
+
+\section{Data Protection}
+\label{sec:gdpr}
+The study processes personal data responses linked to an individual over a session and is designed accordingly. The following would apply were the study run.
+
+\textbf{Lawful basis.} Consent under Art.~6(1)(a) GDPR, obtained through a separate consent screen presented after the information sheet. Consent boxes are unticked by default and the study cannot begin until they are actively ticked, as required by Art.~4(11) and Art.~7. Consent for participation and for storage of responses is requested separately, so that neither is bundled into the other.
+
+\textbf{Data minimisation (Art.~5(1)(c)).} Collected: movie choices, per task durations, questionnaire responses. Not collected: name, email address, IP address, device identifiers. Participants are identified only by a randomly generated code, displayed to them at debrief so that later access or deletion requests remain possible.
+
+\textbf{Withdrawal (Art.~7(3)).} Withdrawal must be as easy as giving consent. A ``Withdraw and delete my data'' control is therefore present on every screen of the study and performs an immediate cascading deletion of all records for that participant, rather than being described in text as a procedure to request by email.
+
+\textbf{Purpose limitation and retention (Art.~5(1)(b), 5(1)(e)).} Data is used only for the stated comparison of elicitation interfaces and would be deleted 30 days after the conclusion of the study.
+
+\textbf{Data subject rights.} Access, rectification, erasure and portability would be served against the participant code; the debrief screen states this and provides the code. Participants are informed of their right to lodge a complaint with the competent supervisory authority.
+
+\textbf{Special categories (Art.~9).} Film preferences can in principle support inferences about religious belief, political opinion or sexual orientation. No such inferences are drawn or stored: the model estimates weights over genre, era, runtime, rating and budget only. The movie pool is additionally screened to avoid titles whose selection would itself be revealing of a special category.
+
+\textbf{Ethics.} The protocol would be submitted for institutional ethics approval before any recruitment. Contact details for the researcher and the data protection officer appear on the information sheet.
+
+\section{Implemented Interface}
+\label{sec:interface}
+The interface implements the full participant facing flow: information sheet, consent, both elicitation conditions with a live block timer, workload questionnaires, break, validation set, and debrief. Condition order is randomised per participant on consent, and the three movie pools are disjoint by construction.
+
+The debrief screen fits $\hat{w}$ from each block separately and shows the participant their tasks completed, elapsed time, validation accuracy and strongest feature weights per condition. In a real run these would be withheld until data collection concluded, to avoid influencing participants who might discuss the study with one another; they are shown here because the interface doubles as a demonstration.
+
+Responses are stored in four tables, participant, elicitation response, workload response, validation response with cascading deletion from the participant record, which is what makes the withdrawal control a genuine erasure rather than an orphaning of rows.
+
+
+\section{Conclusion}
+Two elicitation interfaces were formalised under a common preference model, with the ranking interface handled by a Plackett Luce extension of Bradley Terry that reduces exactly to the pairwise case and admits partial rankings. A within subject study was designed to compare them on accuracy per minute of participant time, with a pre specified analysis plan, counterbalancing against order effects, a shared participant generated validation set, and data protection measures implemented in the interface.
+
+\end{document}

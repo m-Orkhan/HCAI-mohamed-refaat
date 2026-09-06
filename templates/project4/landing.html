@@ -1,0 +1,26 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Project 4 - Preference Elicitation</title>
+    <link rel="stylesheet" href="{% static 'project4/style.css' %}">
+</head>
+<body>
+<div class="container">
+
+<h1>Preference Elicitation for Movie Recommendation</h1>
+
+<p>
+    This project designs a user study comparing two ways of learning what a person
+    likes. 
+</p>
+
+
+<div class="button-row">
+    <a class="btn" href="{% static 'project4/report.pdf' %}" download>Download Report (PDF)</a>
+    <a class="btn btn-primary" href="{% url 'project4:consent' %}">Start the Study</a>
+</div>
+
+</div>
+</body>
+</html>

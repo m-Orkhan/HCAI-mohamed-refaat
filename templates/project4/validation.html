@@ -1,0 +1,34 @@
+{% extends "project4/base_study.html" %}
+{% block content %}
+<div class="study-header">
+    <span>Final section · {{ task_number }} of {{ total }}</span>
+</div>
+
+<h1>Which would you rather watch?</h1>
+<p class="hint">Last set. These help us check how well we learned your preferences.</p>
+
+<form method="post" id="choice-form">
+    {% csrf_token %}
+    <input type="hidden" name="chosen" id="chosen">
+</form>
+
+<div class="pair">
+    {% for m in movies %}
+    <div class="movie-card choice" data-idx="{{ m.idx }}">
+        <h3>{{ m.title }}</h3>
+        <p class="meta">{{ m.year }} · {{ m.duration }} min · IMDb {{ m.imdb_score }}</p>
+        <p class="meta">{{ m.genres }}</p>
+        <p class="meta">Directed by {{ m.director }}</p>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+document.querySelectorAll('.choice').forEach(card =>
+    card.addEventListener('click', () => {
+        document.getElementById('chosen').value = card.dataset.idx;
+        document.getElementById('choice-form').submit();
+    })
+);
+</script>
+{% endblock %}

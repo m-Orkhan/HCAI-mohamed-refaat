@@ -1,0 +1,22 @@
+{% extends "project4/base_study.html" %}
+{% block content %}
+<h1>How did that feel?</h1>
+<p class="hint">Please answer about the block you just finished.</p>
+
+<form method="post">
+    {% csrf_token %}
+    <label>Mental demand — how mentally demanding was the task?</label>
+    <input type="range" name="mental_demand" min="1" max="10" value="5">
+
+    <label>Effort — how hard did you have to work?</label>
+    <input type="range" name="effort" min="1" max="10" value="5">
+
+    <label>Frustration — how irritated or stressed did you feel?</label>
+    <input type="range" name="frustration" min="1" max="10" value="5">
+
+    <label>Satisfaction — how well do you feel this captured your taste?</label>
+    <input type="range" name="satisfaction" min="1" max="10" value="5">
+
+    <button type="submit" class="btn btn-primary">Continue</button>
+</form>
+{% endblock %}

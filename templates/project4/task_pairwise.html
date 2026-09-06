@@ -1,0 +1,53 @@
+{% extends "project4/base_study.html" %}
+{% block content %}
+<div class="study-header">
+    <span>Block {{ block_number }} · Task {{ task_number }}</span>
+    <span id="timer" data-remaining="{{ remaining }}"></span>
+</div>
+
+<h1>Which would you rather watch?</h1>
+
+<form method="post" id="choice-form">
+    {% csrf_token %}
+    <input type="hidden" name="ranked_indices" id="ranked">
+</form>
+
+<div class="pair">
+    {% for m in movies %}
+    <div class="movie-card choice" data-idx="{{ m.idx }}">
+        <h3>{{ m.title }}</h3>
+        <p class="meta">{{ m.year }} · {{ m.duration }} min · IMDb {{ m.imdb_score }}</p>
+        <p class="meta">{{ m.genres }}</p>
+        <p class="meta">Directed by {{ m.director }}</p>
+    </div>
+    {% endfor %}
+</div>
+<button type="button" id="skip" class="btn">I haven't seen either / no preference</button>
+
+<script>
+document.getElementById('skip').addEventListener('click', () => {
+    document.getElementById('ranked').value = '';
+    document.getElementById('choice-form').submit();
+});
+</script>
+
+<script>
+const cards = document.querySelectorAll('.choice');
+const all = Array.from(cards).map(c => c.dataset.idx);
+cards.forEach(card => card.addEventListener('click', () => {
+    const chosen = card.dataset.idx;
+    const other = all.find(i => i !== chosen);
+    document.getElementById('ranked').value = chosen + ',' + other;
+    document.getElementById('choice-form').submit();
+}));
+
+const el = document.getElementById('timer');
+let r = parseInt(el.dataset.remaining);
+function tick() {
+    const m = Math.floor(r / 60), s = String(r % 60).padStart(2, '0');
+    el.textContent = m + ':' + s + ' left in this block';
+    if (r > 0) { r--; setTimeout(tick, 1000); }
+}
+tick();
+</script>
+{% endblock %}

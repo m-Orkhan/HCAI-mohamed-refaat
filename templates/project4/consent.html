@@ -1,0 +1,82 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Information and Consent</title>
+    <link rel="stylesheet" href="{% static 'project4/style.css' %}">
+</head>
+<body>
+<div class="container">
+
+<h1>Information for Participants</h1>
+
+<h2>What is this study?</h2>
+<p>
+    You will be asked to express which movies you would rather watch, using two
+    different interfaces. The purpose is to compare how well each interface captures
+    a person's film preferences. There are no right or wrong answers.
+</p>
+
+<h2>How long does it take?</h2>
+<p>
+    About 20 minutes: two blocks of five minutes each, two short questionnaires,
+    and a final set of 20 comparisons.
+</p>
+
+<h2>What data is collected?</h2>
+<p>
+    Your choices between movies, how long each choice took, and your questionnaire
+    answers. You are identified only by a randomly generated code. We do not collect
+    your name, email address, or IP address.
+</p>
+
+<h2>Your rights</h2>
+<p>
+    Participation is voluntary. You may stop at any time and delete everything you
+    have contributed using the "Withdraw and delete my data" button, which is
+    available on every screen. You may request access to your data or its deletion
+    later using your participant code. You may lodge a complaint with the competent
+    supervisory authority.
+</p>
+
+<h2>Storage and retention</h2>
+<p>
+    Data is stored pseudonymously and would be deleted 30 days after the conclusion
+    of the study. The legal basis for processing is your consent (Art. 6(1)(a) GDPR),
+    which you may withdraw at any time without giving reasons.
+</p>
+
+<h2>Contact</h2>
+<p>
+    Researcher: Placeholder data, Hamburg University of Technology.<br>
+    Email: Placeholder data<br>
+    Data protection officer: Placeholder data
+</p>
+
+
+<h2>Consent</h2>
+<form method="post" id="consent-form">
+    {% csrf_token %}
+    <label class="check">
+        <input type="checkbox" name="consent_participation" id="c1">
+        I have read the information above and agree to take part.
+    </label>
+    <label class="check">
+        <input type="checkbox" name="consent_data_storage" id="c2">
+        I agree that my pseudonymous responses may be stored and analysed.
+    </label>
+    <button type="submit" class="btn btn-primary" id="start-btn" disabled>Begin</button>
+</form>
+
+<script>
+const c1 = document.getElementById('c1');
+const c2 = document.getElementById('c2');
+const btn = document.getElementById('start-btn');
+function update() { btn.disabled = !(c1.checked && c2.checked); }
+c1.addEventListener('change', update);
+c2.addEventListener('change', update);
+</script>
+
+</div>
+</body>
+</html>

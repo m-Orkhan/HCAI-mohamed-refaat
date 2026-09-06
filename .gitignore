@@ -183,3 +183,6 @@ project3/models/
 report/*.aux
 report/*.log
 report/*.out
+report4/*.aux
+report4/*.log
+report4/*.out

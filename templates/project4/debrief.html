@@ -1,0 +1,30 @@
+{% extends "project4/base_study.html" %}
+{% block content %}
+<h1>Thank you</h1>
+
+<p>
+    You have completed the study. Your participant code is <strong>{{ pid }}</strong>.
+    Keep it if you later want your data accessed or deleted.
+</p>
+
+<h2>What we learned about your taste</h2>
+<p class="hint">
+    Each interface produced its own estimate of your preferences, scored against the
+    same final 20 comparisons. In the real study these numbers would not be shown
+    until after all data collection.
+</p>
+
+{% for condition, r in results.items %}
+<div class="result-box">
+    <h3>{{ condition|capfirst }}</h3>
+    <p>{{ r.n_tasks }} tasks in {{ r.minutes }} minutes · {{ r.accuracy }}% accuracy on the held-out comparisons</p>
+    <p class="meta">Strongest weights: 
+        {% for name, value in r.top_weights %}{{ name }} {{ value }}{% if not forloop.last %} · {% endif %}{% endfor %}
+    </p>
+</div>
+{% endfor %}
+
+<p>
+    You may still withdraw and delete everything using the button below.
+</p>
+{% endblock %}

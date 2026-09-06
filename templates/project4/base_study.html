@@ -1,0 +1,19 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{% block title %}Preference Study{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'project4/style.css' %}">
+</head>
+<body>
+<div class="container">
+{% block content %}{% endblock %}
+
+<form method="post" action="{% url 'project4:withdraw' %}" class="withdraw-form"
+      onsubmit="return confirm('This permanently deletes everything you have contributed. Continue?');">
+    {% csrf_token %}
+    <button type="submit" class="btn-withdraw">Withdraw and delete my data</button>
+</form>
+</div>
+</body>
+</html>

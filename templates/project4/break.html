@@ -1,0 +1,14 @@
+{% extends "project4/base_study.html" %}
+{% block content %}
+<h1>Take a short break</h1>
+<p>
+    The first part is done. The second part uses a different interface: you will be
+    asked to {% if next_condition == 'ranking' %}rank ten movies from most to least
+    preferred{% else %}choose between two movies at a time{% endif %}.
+</p>
+<p>Continue whenever you are ready.</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary">Start the second part</button>
+</form>
+{% endblock %}
