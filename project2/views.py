@@ -196,36 +196,47 @@ def get_penguin_options(df_raw):
         options.append((i, label))
     return options
 
-def generate_counterfactuals(x_original, target_class, clf, feature_cols, df_encoded_features, N=10000, k=3, scaler=None):
-    categorical_indices = [feature_cols.index('island'), feature_cols.index('sex'), feature_cols.index('year')]
-    samples = []
-    for _ in range(N):
-        new_point = x_original.copy().astype(float)
-        for j, col in enumerate(feature_cols):
-            if j in categorical_indices:
-                unique_vals = df_encoded_features.iloc[:, j].unique()
-                new_point[j] = np.random.choice(unique_vals)
-            else:
-                std = df_encoded_features.iloc[:, j].std()
-                new_point[j] = x_original[j] + np.random.normal(0, std * 0.5)
-        samples.append(new_point)
+def generate_counterfactuals(x_original, target_class, clf, feature_cols,
+                             df_encoded_features, N=10000, k=3, scaler=None,
+                             max_attempts=4):
+    categorical_indices = [feature_cols.index('island'),
+                           feature_cols.index('sex'),
+                           feature_cols.index('year')]
+    matching = np.empty((0, len(feature_cols)))
 
-    samples = np.array(samples)
+    for attempt in range(max_attempts):
+        n_samples = N * (2 ** attempt)
+        spread = 0.5 * (1.5 ** attempt)
 
-    if scaler is not None:
-        preds = clf.predict(scaler.transform(samples))
-    else:
-        preds = clf.predict(samples)
+        samples = []
+        for _ in range(n_samples):
+            new_point = x_original.copy().astype(float)
+            for j, col in enumerate(feature_cols):
+                if j in categorical_indices:
+                    new_point[j] = np.random.choice(df_encoded_features.iloc[:, j].unique())
+                else:
+                    std = df_encoded_features.iloc[:, j].std()
+                    new_point[j] = x_original[j] + np.random.normal(0, std * spread)
+            samples.append(new_point)
 
-    matching = samples[preds == target_class]
+        samples = np.array(samples)
+        if scaler is not None:
+            preds = clf.predict(scaler.transform(samples))
+        else:
+            preds = clf.predict(samples)
+
+        matching = samples[preds == target_class]
+        if len(matching) > 0:
+            break
+
     if len(matching) == 0:
         return None
 
-    mad = np.median(np.abs(df_encoded_features.to_numpy() - np.median(df_encoded_features.to_numpy(), axis=0)), axis=0)
+    mad = np.median(np.abs(df_encoded_features.to_numpy()
+                           - np.median(df_encoded_features.to_numpy(), axis=0)), axis=0)
     mad = np.where(mad == 0, 1, mad)
     distances = np.sum(np.abs(matching - x_original) / mad, axis=1)
-    top_k_idx = np.argsort(distances)[:k]
-    return matching[top_k_idx]
+    return matching[np.argsort(distances)[:k]]
 
 def index(request):
     X, y, feature_cols, df_raw, df_encoded = load_and_prepare()
